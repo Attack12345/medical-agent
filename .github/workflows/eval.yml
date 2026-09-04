@@ -44,6 +44,8 @@ jobs:
       MYSQL_PASSWORD: root
       MYSQL_DB: medical_agent
       DASHSCOPE_API_KEY: ${{ secrets.DASHSCOPE_API_KEY }}
+      # CI 无 key：显式开启离线哈希向量（构建/查询同空间，仅保链路可运行，无语义质量）
+      EMBEDDING_OFFLINE: "1"
 
     steps:
       - uses: actions/checkout@v4

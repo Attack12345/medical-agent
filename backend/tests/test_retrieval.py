@@ -87,3 +87,32 @@ def test_retrieve_end_to_end():
         assert "高血压" in names, "实体链接应命中'高血压'"
     finally:
         repo.close()
+
+
+# ---------- 离线哈希向量（EMBEDDING_OFFLINE，CI 兜底） ----------
+
+def test_offline_embedding_deterministic(monkeypatch):
+    """EMBEDDING_OFFLINE=1：确定性、维度正确、L2 归一化、非全零。"""
+    import math
+
+    from app.config import settings
+    from app.retrieval import embedding as emb
+
+    monkeypatch.setattr(settings, "embedding_offline", True)
+    v1 = emb.embed_texts(["头痛吃什么药", "发热"])
+    v2 = emb.embed_texts(["头痛吃什么药", "发热"])
+    assert v1 == v2, "同输入必须同向量（幂等/可复现）"
+    dim = settings.embedding_dim
+    for vec in v1:
+        assert len(vec) == dim
+        norm = math.sqrt(sum(x * x for x in vec))
+        assert abs(norm - 1.0) < 1e-6, "应 L2 归一化"
+        assert any(x != 0.0 for x in vec), "不应全零"
+    assert emb.embed_query("单条查询") == emb.embed_texts(["单条查询"])[0], "query 与 texts 应同空间"
+    assert emb.embed_texts([]) == []
+
+
+def test_offline_off_by_default():
+    """默认关闭：本地/生产不传 key 时仍走真实 API 路径（抛 EmbeddingError 而非静默降级）。"""
+    from app.config import settings
+    assert settings.embedding_offline is False

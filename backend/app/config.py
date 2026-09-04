@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     embedding_model: str = "text-embedding-v3"
     embedding_dim: int = 1024
     embedding_batch_size: int = 10
+    # 离线向量开关：仅 CI/无 key 环境显式开启（EMBEDDING_OFFLINE=1），
+    # 用确定性哈希向量保证向量库构建/检索链路可运行（无语义质量）；生产严禁开启
+    embedding_offline: bool = False
 
     # Neo4j（M2 用，Docker compose infra/，宿主端口 7688/7475）
     neo4j_uri: str = "bolt://127.0.0.1:7688"

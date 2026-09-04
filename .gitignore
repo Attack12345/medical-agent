@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# 敏感配置（红线8）
+.env
+
+# 数据（数据集/清洗结果，gitignore；评估集/配置白名单入库）
+data/raw/
+data/cleaned/
+data/simulated/
+data/*.json
+!data/intent_keywords.json
+!data/retrieval_eval.json
+!data/retrieval_baseline.json
+!data/golden_eval.json
+data/source_meta.json
+
+# 日志/临时
+*.log
+.DS_Store
+# 个人评估报告（本地保留）
+docs/judge_report.md
+.pytest_cache/
+DEV_DOC.md
+docs/learning/
+docs/interview-qa.md

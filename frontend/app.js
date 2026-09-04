@@ -230,7 +230,9 @@ function evidenceToggle(pool) {
   for (const p of pool || []) {
     let readable;
     if (p.type === "GRAPH_NODE") {
-      readable = String(p.ref || "").replace(/^[A-Z_]+:/, "").replace(/→/g, " → ") + "（知识图谱）";
+      // 技术符号不外露：剥掉关系前缀（VISITS:/TREATS:），箭头改为顿号连接
+      const parts = String(p.ref || "").replace(/^[A-Z_]+:/, "").split("→").map(s => s.trim()).filter(Boolean);
+      readable = "涉及：" + parts.join("、") + "（知识图谱）";
     } else {
       readable = String(p.quote || "相关资料").slice(0, 20) + "（资料检索）";
     }

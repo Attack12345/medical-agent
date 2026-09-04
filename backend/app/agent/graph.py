@@ -131,7 +131,7 @@ def ask_interrupt_aware(question: str, thread_id: str) -> tuple[dict, str | None
         # 问题（横幅误挂）、上一轮拒答会传染（S004 误判）。分支节点未输出的字段由
         # 此处兜底归零；分支节点输出的值正常覆盖。
         clean_input = {
-            "question": question, **(extra_input or {}),
+            "question": question,
             "answer": "", "answer_sections": [], "answer_tags": {},
             "risk_level": "NONE", "refusal": False, "invalidated": False,
             "high_risk_query": False, "disclaimer": "", "drug_notice": "",

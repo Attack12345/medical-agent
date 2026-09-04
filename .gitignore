@@ -21,6 +21,7 @@ data/source_meta.json
 
 # 日志/临时
 *.log
+*.err
 .DS_Store
 # 个人评估报告（本地保留）
 docs/judge_report.md

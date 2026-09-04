@@ -75,6 +75,7 @@ async def _stream_chat(conv_id: int, question: str):
             await asyncio.sleep(TOKEN_INTERVAL)
         yield _sse("risk", {"risk_level": "NONE", "disclaimer": "", "drug_notice": "", "refusal": False})
         db.insert_message(conv_id, "USER", question, intent=state.get("intent"))
+        db.maybe_set_title(conv_id, question)  # M8.18 恢复丢失的调用：首问自动命名会话
         message_id = db.insert_message(conv_id, "ASSISTANT", clarify, intent=state.get("intent"),
                                        evidence_json={}, risk_level="NONE", disclaimer_added=0)
         yield _sse("done", {"message_id": message_id, "answer": clarify, "sections": [], "tags": {},
@@ -105,6 +106,7 @@ async def _stream_chat(conv_id: int, question: str):
         "tags": state.get("answer_tags", {}),
     }
     db.insert_message(conv_id, "USER", question, intent=state.get("intent"))
+    db.maybe_set_title(conv_id, question)  # M8.18 恢复丢失的调用：首问自动命名会话
     message_id = db.insert_message(
         conv_id, "ASSISTANT", answer,
         intent=state.get("intent"),

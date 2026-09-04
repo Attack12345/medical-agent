@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -64,6 +65,19 @@ def intent_agent(state: dict) -> dict:
     return {"intent": intent, "audit": [f"intent_agent: {intent}"]}
 
 
+# 否定/缓解线索词（M8.18）：命中时抽取前后 3 字片段，用于继承实体的否定剔除
+_NEG_CUE_RE = re.compile(r"不疼|不痛|不痒|不咳|不闷|不麻|不胀|不晕|退了|缓解|好转|消失|减轻|好了")
+
+
+def _negated_fragments(text: str) -> str:
+    """抽取否定词周边片段（否定词前后各 3 字）拼接返回；无否定线索返回空串。
+
+    例："头不疼了，手疼" → 片段含"头"，继承实体"头痛/头晕"按身体部位字剔除。
+    """
+    frags = [text[max(0, m.start() - 3): m.end() + 3] for m in _NEG_CUE_RE.finditer(text)]
+    return " ".join(frags)
+
+
 def symptom_agent(state: dict) -> dict:
     """实体链接 + 问诊 HITL：信息不足时 interrupt 追问（最多 MAX_FOLLOW_UP 次）。
 
@@ -86,13 +100,28 @@ def symptom_agent(state: dict) -> dict:
 
     # 多轮上下文继承（M8.3）：本轮未链接到实体，但上一轮有（如"我头疼"后问"应该吃什么药？"）
     # → 复用上一轮实体，保证追问式跟进有上下文（CHAT 意图不经本节点，不会误继承）。
+    # M8.18 否定剔除：用户表达"X不疼了/缓解/好了"时上轮对应症状不再成立，
+    # 继承前按否定片段剔除（"头不疼了，手疼"不得再按头痛给建议）。
     if not linked:
         prev = state.get("entities") or []
         if prev:
-            carried = [{"name": e["name"], "label": e["label"],
-                        "confidence": e.get("confidence", 0.9)} for e in prev]
-            return {"entities": carried, "need_more": False,
-                    "audit": [f"symptom_agent: 继承上轮实体 {[e['name'] for e in carried]}"]}
+            neg_frag = _negated_fragments(text)
+            carried, dropped = [], []
+            for e in prev:
+                name = str(e.get("name", ""))
+                if neg_frag and any(ch in neg_frag for ch in name if ch not in "不没了的，。、"):
+                    dropped.append(name)
+                    continue
+                carried.append({"name": name, "label": e.get("label", "Symptom"),
+                                "confidence": e.get("confidence", 0.9)})
+            if carried:
+                note = f"（否定剔除 {dropped}）" if dropped else ""
+                return {"entities": carried, "need_more": False,
+                        "audit": [f"symptom_agent: 继承上轮实体 {[e['name'] for e in carried]}{note}"]}
+            if dropped:
+                # 上轮实体全部被否定 → 不继承也不追问（用户刚描述过现状），按新主诉走检索
+                return {"entities": [], "need_more": False,
+                        "audit": [f"symptom_agent: 上轮实体全部被否定剔除 {dropped}，按新主诉检索"]}
 
     if not linked and left > 0:
         # 信息不足：interrupt 追问（resume 值并入 collected_text 后重入本节点）

@@ -26,6 +26,11 @@ MEDICAL_INTENTS = {"DEPARTMENT", "DRUG", "KNOWLEDGE", "GUIDE"}
 DISCLAIMER_TEXT = "以上信息仅供参考，不能替代专业医疗建议，如有不适请及时就医。"
 DRUG_NOTICE_TEXT = "请遵医嘱或药师指导使用，切勿自行调整剂量。"
 REFUSAL_TEXT = "该问题涉及用药安全，建议咨询医生或药师，本助手暂不回答。"
+# 非 S004 的 grounded 拒答（证据不足以回答）：中性表述 + 行动指导，
+# 不再套用"用药安全"话术（拒答不等于问题涉及用药），也不编造图谱外的科室建议
+NEUTRAL_REFUSAL_TEXT = ("根据知识库信息，我暂时没有找到与您描述完全匹配的可靠资料，无法给出有依据的具体建议。"
+                        "建议尽快前往医院就诊，由医生当面评估；就诊前可记录症状的部位、性质、持续时间和诱因，"
+                        "若症状突然加重或持续不缓解，请立即就医。")
 
 # 急症词口语变体（medical_aliases.yaml symptoms 别名反向映射，S002 检测用）
 _emergency_aliases: dict[str, str] = {}
@@ -166,7 +171,11 @@ def fusion_agent(state: dict) -> dict:
             base = "您描述的情况可能属于急症，请优先前往急诊就医。"
         final = _assemble(state, base)
     elif state.get("refusal"):
-        final = REFUSAL_TEXT
+        # 拒答话术分层（M8.18）：S004（高风险+检索落空）保留用药安全措辞；
+        # 其余 grounded 拒答（证据不足）用中性话术 + 行动指导
+        s004 = any(t.get("rule_id") == "S004" and t.get("hit")
+                   for t in state.get("safety_trail", []))
+        final = REFUSAL_TEXT if s004 else NEUTRAL_REFUSAL_TEXT
     elif not state.get("answer"):
         final = "根据知识库信息，暂未检索到与您问题直接相关的可靠资料，建议前往医院就诊咨询专科医生。"
     else:

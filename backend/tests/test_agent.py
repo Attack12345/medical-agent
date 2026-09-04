@@ -170,3 +170,41 @@ def test_fusion_invalidated_with_pool_still_refuses(monkeypatch):
           "risk_level": "NONE", "disclaimer": "", "entities": []}
     out = nodes_safety.fusion_agent(st)
     assert out["answer"] == nodes_safety.REFUSAL_TEXT
+
+
+# ---------- 多轮否定剔除（M8.18："头不疼了，手疼"不得再按头痛给建议） ----------
+
+def test_negated_fragments_extraction():
+    from app.agent.nodes_basic import _negated_fragments
+    assert "头" in _negated_fragments("头不疼了，手疼")
+    assert "热" in _negated_fragments("发热退了，现在咳嗽")
+    assert _negated_fragments("应该吃什么药") == ""
+
+
+def test_carry_forward_drops_negated_entities(monkeypatch):
+    """上轮头痛+头晕，本轮"头不疼了，手疼"且链接为空 → 全部剔除，不追问、不继承。"""
+    from app.agent import nodes_basic as nb
+
+    monkeypatch.setattr(nb, "get_linker",
+                        lambda: type("L", (), {"link_text": lambda self, text, query_vector=None: []})())
+    state = {"question": "头不疼了，手疼", "collected_text": "头不疼了，手疼",
+             "entities": [{"name": "头痛", "label": "Symptom"}, {"name": "头晕", "label": "Symptom"}],
+             "follow_up_left": 2}
+    out = nb.symptom_agent(state)
+    assert out["entities"] == [] and out["need_more"] is False
+    # 对照：无否定线索时正常继承
+    state2 = dict(state, question="应该吃什么药", collected_text="应该吃什么药")
+    out2 = nb.symptom_agent(state2)
+    assert [e["name"] for e in out2["entities"]] == ["头痛", "头晕"]
+
+
+def test_fusion_neutral_refusal_for_non_s004():
+    """非 S004 的 grounded 拒答用中性话术+行动指导，不再套用药安全措辞。"""
+    from app.agent import nodes_safety
+
+    st = {"refusal": True, "risk_level": "NONE", "evidence_quotes": [],
+          "safety_trail": [{"rule_id": "S102", "hit": False}], "answer": "", "disclaimer": ""}
+    out = nodes_safety.fusion_agent(st)
+    assert out["answer"] == nodes_safety.NEUTRAL_REFUSAL_TEXT
+    st2 = dict(st, safety_trail=[{"rule_id": "S004", "hit": True}])
+    assert nodes_safety.fusion_agent(st2)["answer"] == nodes_safety.REFUSAL_TEXT

@@ -62,11 +62,17 @@ def _get_rules():
     return _rules
 
 
+def _pain_norm(s: str) -> str:
+    """疼/痛 变体归一（M8.21）：口语"头疼"与图谱节点"头痛"视为同一症状词。"""
+    return str(s).replace("疼", "痛")
+
+
 def extract_citations(answer: str, evidence_pool: list[dict],
                       graph_evidence: list[dict], entities: list[dict]) -> list[str]:
     """确定性引用提取（§5.3 第4步）：回答中出现的证据来源短语（去重保序）。
 
     词表 = 图谱三元组 subject/object + 实体名 + 证据池 quote 前 12 字。
+    匹配用疼/痛归一（用户原话"头疼"与节点"头痛"互认）。
     """
     vocab: list[str] = []
     seen: set[str] = set()
@@ -84,7 +90,8 @@ def extract_citations(answer: str, evidence_pool: list[dict],
         if q and q not in seen:
             seen.add(q)
             vocab.append(q)
-    return [v for v in vocab if v and v in answer]
+    ans_norm = _pain_norm(answer)
+    return [v for v in vocab if v and (v in answer or _pain_norm(v) in ans_norm)]
 
 
 def safety_agent(state: dict) -> dict:

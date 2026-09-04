@@ -218,3 +218,20 @@ def test_fusion_neutral_refusal_for_non_s004():
     assert out["answer"] == nodes_safety.NEUTRAL_REFUSAL_TEXT
     st2 = dict(st, safety_trail=[{"rule_id": "S004", "hit": True}])
     assert nodes_safety.fusion_agent(st2)["answer"] == nodes_safety.REFUSAL_TEXT
+
+
+# ---------- 分诊结论句用用户原话短语（M8.21："手和头疼"第一句必须覆盖手） ----------
+
+def test_lead_phrase_strips_prefixes():
+    from app.agent.nodes_domain import _lead_phrase
+    assert _lead_phrase("手和头疼") == "手和头疼"
+    assert _lead_phrase("我最近总是头痛头晕") == "头痛头晕"
+    assert _lead_phrase("我感觉有点手疼") == "手疼"
+
+
+def test_extract_citations_pain_norm(monkeypatch):
+    """口语"头疼"与图谱节点"头痛"在引用提取时互认（否则原话结论句被 S101 误杀）。"""
+    from app.agent.nodes_safety import extract_citations
+    q = extract_citations("根据知识库信息，手和头疼，建议就诊神经内科。", [], [],
+                          [{"name": "头痛", "label": "Symptom"}])
+    assert "头痛" in q

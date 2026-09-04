@@ -515,6 +515,15 @@ def medical_knowledge_agent(state: dict) -> dict:
     return out
 
 
+_LEAD_STRIP_RE = re.compile(r"^(我|我们|你|最近|这几天|今天|昨天|现在|一直|总是|老是|感觉|有点|比较|非常|特别|好像|可能)+")
+
+
+def _lead_phrase(question: str) -> str:
+    """剥离主诉前缀（人称/时间/程度词）得到结论句用的症状短语（M8.21）。"""
+    lead = _LEAD_STRIP_RE.sub("", str(question)).strip("，。！！?？ 、,. ")
+    return lead
+
+
 def _symptom_triage(state: dict, symptom_names: list[str], env: dict) -> dict:
     """症状主诉 → 分诊卡：推荐科室 + 就医建议，不罗列可能疾病（避免罕见/耸动病名恐吓）。"""
     repo = env["repo"]
@@ -525,7 +534,13 @@ def _symptom_triage(state: dict, symptom_names: list[str], env: dict) -> dict:
                 "audit": ["symptom_triage: 无科室 → 走 grounded 兜底"]}
     primary = depts[0]
     question = state.get("collected_text") or state.get("question", "")
-    answer = f"根据知识库信息，{'、'.join(symptom_names[:2])}建议就诊{primary}。"
+    # M8.21 结论句用用户原话短语（剥离"我/最近"等前缀），保证覆盖用户提到的全部部位
+    # （"手和头疼"不再只剩"头痛"）；原话过长或剥离后为空时退回实体名模板。
+    lead = _lead_phrase(question)
+    if lead and len(lead) <= 30:
+        answer = f"根据知识库信息，{lead}，建议就诊{primary}。"
+    else:
+        answer = f"根据知识库信息，{'、'.join(symptom_names[:2])}建议就诊{primary}。"
     try:
         data = chat_json(
             "你是医院分诊导诊助手。用户描述了一个症状，请给出实用的就医建议要点。"

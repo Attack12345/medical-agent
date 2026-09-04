@@ -78,6 +78,17 @@ def _negated_fragments(text: str) -> str:
     return " ".join(frags)
 
 
+def _dedupe_entities(entities: list[dict]) -> list[dict]:
+    """同类实体包含去重（M8.18b）：名称互为子串时保留更具体的长名。
+
+    真实图谱存在"头痛头晕"与"头痛"两个节点，口语问句常同时命中，
+    不去重会让标签出现"头痛头晕、头痛"式重复，结论句也随之累赘。
+    """
+    names = [str(e.get("name", "")) for e in entities]
+    return [e for e, n in zip(entities, names)
+            if not (n and any(n != other and n in other for other in names))]
+
+
 def symptom_agent(state: dict) -> dict:
     """实体链接 + 问诊 HITL：信息不足时 interrupt 追问（最多 MAX_FOLLOW_UP 次）。
 
@@ -96,7 +107,8 @@ def symptom_agent(state: dict) -> dict:
     except Exception:
         qvec = None  # embedding 不可用 → 退化纯精确/别名链接（§4.4）
     entities = get_linker().link_text(text, query_vector=qvec)
-    linked = [{"name": name, "label": label, "confidence": conf} for name, label, conf in entities]
+    linked = _dedupe_entities([{"name": name, "label": label, "confidence": conf}
+                               for name, label, conf in entities])
 
     # 多轮上下文继承（M8.3）：本轮未链接到实体，但上一轮有（如"我头疼"后问"应该吃什么药？"）
     # → 复用上一轮实体，保证追问式跟进有上下文（CHAT 意图不经本节点，不会误继承）。
@@ -115,6 +127,7 @@ def symptom_agent(state: dict) -> dict:
                 carried.append({"name": name, "label": e.get("label", "Symptom"),
                                 "confidence": e.get("confidence", 0.9)})
             if carried:
+                carried = _dedupe_entities(carried)
                 note = f"（否定剔除 {dropped}）" if dropped else ""
                 return {"entities": carried, "need_more": False,
                         "audit": [f"symptom_agent: 继承上轮实体 {[e['name'] for e in carried]}{note}"]}

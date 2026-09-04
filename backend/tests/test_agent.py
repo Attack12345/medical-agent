@@ -111,3 +111,62 @@ def test_hitl_interrupt_resume():
     assert state["answer"], "HITL 回答为空"
     names = {e["name"] for e in state.get("entities", [])}
     assert "头痛" in names and "发热" in names, "追问补充的实体应被链接"
+
+
+# ---------- 无 LLM 环境兜底（M8.16：CI/离线不把"LLM 失败"升格为"拒答"） ----------
+
+def test_draft_llm_unavailable_falls_back_to_pool_summary(monkeypatch):
+    """LLM 不可用 + 证据池非空 → 确定性摘 要回答（拒绝=False，实体名在答案内，箭头不外泄）。"""
+    from app.agent import nodes_domain
+
+    def boom(*a, **k):
+        raise RuntimeError("no api key")
+
+    monkeypatch.setattr(nodes_domain, "chat_json", boom)
+    state = {"question": "什么是糖尿病", "collected_text": "什么是糖尿病",
+             "entities": [{"name": "2型糖尿病", "label": "Disease"}],
+             "evidence_pool": [
+                 {"type": "GRAPH_NODE", "quote": "2型糖尿病 → 多饮", "score": 1.0},
+                 {"type": "RETRIEVAL", "quote": "2型糖尿病建议：就诊内分泌科，控制主食量。", "score": 1.0}]}
+    out = nodes_domain._draft(state, "p")
+    assert out["refusal"] is False
+    assert "2型糖尿病" in out["answer"] and "多饮" in out["answer"]
+    assert "→" not in out["answer"]
+    assert not out["answer"].endswith("。。")
+
+
+def test_draft_llm_unavailable_high_risk_still_refuses(monkeypatch):
+    """LLM 不可用 + 高风险问题 + 证据池空 → 仍拒答（S004 语义不放松）。"""
+    from app.agent import nodes_domain
+
+    def boom(*a, **k):
+        raise RuntimeError("no api key")
+
+    monkeypatch.setattr(nodes_domain, "chat_json", boom)
+    out = nodes_domain._draft({"question": "药物过量怎么办", "entities": [], "evidence_pool": []}, "p")
+    assert out["refusal"] is True
+
+
+def test_fusion_invalidated_empty_pool_keeps_honest_answer(monkeypatch):
+    """S101 重生成失败 + 证据池为空 → 保留分支节点如实说明，不升格为拒答。"""
+    from app.agent import nodes_safety
+
+    monkeypatch.setattr(nodes_safety, "chat_json", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("no key")))
+    st = {"answer": "根据知识库信息，暂未检索到相关就医指导，建议前往医院咨询。",
+          "evidence_pool": [], "evidence_quotes": [], "invalidated": True,
+          "risk_level": "NONE", "disclaimer": nodes_safety.DISCLAIMER_TEXT, "entities": []}
+    out = nodes_safety.fusion_agent(st)
+    assert "暂未检索到" in out["answer"]
+    assert nodes_safety.REFUSAL_TEXT not in out["answer"]
+
+
+def test_fusion_invalidated_with_pool_still_refuses(monkeypatch):
+    """S101 重生成失败 + 有证据池 → 仍拒答（防无引用内容外泄，原语义保留）。"""
+    from app.agent import nodes_safety
+
+    monkeypatch.setattr(nodes_safety, "chat_json", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("no key")))
+    st = {"answer": "某个无引用回答", "evidence_pool": [{"type": "RETRIEVAL", "quote": "x"}],
+          "evidence_quotes": [], "invalidated": True,
+          "risk_level": "NONE", "disclaimer": "", "entities": []}
+    out = nodes_safety.fusion_agent(st)
+    assert out["answer"] == nodes_safety.REFUSAL_TEXT

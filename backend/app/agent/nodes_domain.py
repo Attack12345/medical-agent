@@ -178,6 +178,31 @@ def _draft(state: dict, prompt: str, evidence: list[dict] | None = None) -> dict
                 "answer_sections": sections, "answer_tags": tags,
                 "audit": [f"grounded: 证据池 {len(pool)} 条 → LLM 生成"]}
     except Exception as e:
+        # LLM 不可用（无 key/网络失败）且证据池非空 → 确定性摘 要回答兜底：
+        # 内容仍严格取自证据池（grounded 原则不变），不把"LLM 失败"升格为"拒答"，
+        # 否则无 LLM 环境（CI/离线演示）下全部 grounded 问答被误拒。
+        # 回答显式含实体名（引用提取词表必含实体名 → S101 必有引用锚点）。
+        if pool:
+            entities = state.get("entities", [])
+            names = [str(e.get("name", "")).strip() for e in entities if e.get("name")]
+            frags: list[str] = []
+            for p in pool[:4]:
+                quote = str(p.get("quote", ""))
+                if p.get("type") == "GRAPH_NODE" and "→" in quote:
+                    sub, _, obj = quote.partition("→")
+                    frag = f"{sub.strip()}与{obj.strip()}相关"
+                else:
+                    frag = quote.strip()
+                frag = frag[:80].rstrip("。；;，, ")
+                if frag and not _is_sensitive(frag):
+                    frags.append(frag)
+            frags = list(dict.fromkeys(frags))[:3]
+            if frags:
+                head = f"关于{'、'.join(names[:2])}，" if names else ""
+                answer = f"根据知识库信息，{head}" + "；".join(frags) + "。"
+                return {"refusal": False, "answer": answer,
+                        "high_risk_query": _is_high_risk(question),
+                        "audit": [f"grounded: LLM 不可用 → 证据池摘 要兜底（{e}）"]}
         return {"refusal": True, "answer": "", "high_risk_query": _is_high_risk(question),
                 "audit": [f"grounded: LLM 失败 {e}"]}
 

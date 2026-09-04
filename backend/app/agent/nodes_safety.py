@@ -174,10 +174,16 @@ def fusion_agent(state: dict) -> dict:
         # §5.3 第4步：S101/S102 命中 → 重生成一次（强制引用池内内容），仍无引用 → 拒答
         if state.get("invalidated"):
             answer, quotes = _regenerate_with_citation(state)
-            if not quotes:
+            if quotes:
+                final = _assemble(state, answer)
+            elif state.get("evidence_pool"):
+                # 有证据却引不出来 → 拒答（防无引用内容外泄，原语义保留）
                 final = REFUSAL_TEXT
             else:
-                final = _assemble(state, answer)
+                # 证据池为空：原回答是分支节点确定性产出的"如实说明"（模板，非 LLM 生成），
+                # 它本就不可能携带引用，重生成失败应原样保留而非升格为拒答
+                # （修复：无 LLM 环境下"怎么挂号就医"类 GUIDE 问题被误拒为"用药安全"）。
+                final = _assemble(state, state.get("answer", ""))
         else:
             final = _assemble(state, answer)
     return {

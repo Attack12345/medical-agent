@@ -1,0 +1,32 @@
+# MedicalConsultationAgent 基础设施（Neo4j 图谱 + Qdrant 向量库 + Redis 会话缓存）
+# 启动：docker compose -f infra/docker-compose.yml up -d
+# name 显式锁定 project（默认取 compose 所在目录名，会与其他项目的 infra/ 串项目）
+name: medical-agent
+services:
+  neo4j:
+    image: neo4j:5.26.0
+    container_name: medical_neo4j
+    restart: unless-stopped
+    ports:
+      - "7688:7687"   # Bolt（宿主 7688）
+      - "7475:7474"   # HTTP 控制台（宿主 7475）
+    environment:
+      NEO4J_AUTH: "neo4j/neo4j1234"
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+
+  qdrant:
+    image: qdrant/qdrant:v1.15.0
+    container_name: medical_qdrant
+    restart: unless-stopped
+    ports:
+      - "6335:6333"   # REST（宿主 6335）
+      - "6336:6334"   # gRPC（宿主 6336）
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+volumes:
+  neo4j_data:
+  neo4j_logs:
+  qdrant_data:

@@ -1,0 +1,5 @@
+# rerank 实验依赖（实测负收益未接入主链路；复现实验时单独安装）
+# 用法：pip install -r requirements-rerank.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
+# 模型：BAAI/bge-reranker-base（HF_ENDPOINT=https://hf-mirror.com 镜像下载，约 1.1GB）
+torch==2.14.0
+sentence-transformers==6.0.1

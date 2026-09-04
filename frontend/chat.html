@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>智慧问诊Agent系统</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="app">
+  <!-- 左栏 -->
+  <aside class="sidebar">
+    <div class="logo-row">
+      <div class="logo-badge">问</div>
+      <div>
+        <div class="brand">智慧问诊Agent系统</div>
+        <div class="brand-sub">智能医疗 · 知识图谱驱动</div>
+      </div>
+    </div>
+
+    <button id="btn-new-conv" class="btn-new">＋ 开启新对话</button>
+
+    <div class="side-section">
+      <div class="side-title">对话历史</div>
+      <ul id="conv-list" class="conv-list"></ul>
+    </div>
+
+    <div class="side-section">
+      <div class="side-title">我能帮您</div>
+      <div class="help-grid">
+        <button class="help-card" data-q="我最近头痛、头晕，应该挂什么科？"><span class="help-icon">📋</span><span>看病挂号</span><small>按症状推荐就诊科室</small></button>
+        <button class="help-card" data-q="高血压吃什么药"><span class="help-icon">💊</span><span>用药建议</span><small>药物 / 副作用 / 禁忌</small></button>
+        <button class="help-card" data-q="什么是糖尿病？"><span class="help-icon">📖</span><span>医学知识</span><small>疾病科普与解读</small></button>
+        <button class="help-card" data-q="我胸口突然很痛，喘不上气"><span class="help-icon">⚠️</span><span>急症识别</span><small>危险信号即时预警</small></button>
+      </div>
+    </div>
+
+    <div class="side-section status-section">
+      <div class="side-title">系统状态</div>
+      <div class="status-item"><span>Neo4j 图谱</span><span class="status-badge" id="st-neo4j">检测中…</span></div>
+      <div class="status-item"><span>向量索引</span><span class="status-badge" id="st-qdrant">检测中…</span></div>
+      <div class="status-item"><span>Agent 系统</span><span class="status-badge" id="st-agent">检测中…</span></div>
+    </div>
+
+    <div class="sidebar-footer" id="user-info"></div>
+    <div class="version">v1.0.0 • 仅供参考，请遵医嘱</div>
+  </aside>
+
+  <!-- 主区 -->
+  <main class="main">
+    <!-- 顶部警示横幅（常驻） -->
+    <div class="top-banner">⚠️ 本系统仅供健康咨询与就医指导，不能替代专业医疗诊断。身体不适请及时就医，切勿自行用药。</div>
+
+    <!-- 登录区 -->
+    <section id="login-panel" class="login-panel hidden">
+      <div class="login-card">
+        <h2>登录 / 注册</h2>
+        <input id="login-username" type="text" placeholder="用户名" autocomplete="username">
+        <input id="login-password" type="password" placeholder="密码（至少 6 位）" autocomplete="current-password">
+        <div class="login-actions">
+          <button id="btn-login" class="btn primary">登录</button>
+          <button id="btn-register" class="btn">注册</button>
+        </div>
+        <div id="login-msg" class="msg"></div>
+      </div>
+    </section>
+
+    <!-- 聊天区 -->
+    <section id="chat-panel" class="chat-panel hidden">
+      <div id="risk-banner" class="risk-banner hidden"></div>
+      <div id="message-flow" class="message-flow"></div>
+      <div class="input-area">
+        <textarea id="question-input" rows="2" placeholder="请描述您的症状或健康问题，回车发送…"></textarea>
+        <button id="btn-send" class="btn-send">发送</button>
+      </div>
+    </section>
+  </main>
+</div>
+<script src="app.js"></script>
+</body>
+</html>

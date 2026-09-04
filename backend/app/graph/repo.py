@@ -15,6 +15,10 @@ class GraphRepo:
         self.driver = GraphDatabase.driver(
             uri or settings.neo4j_uri,
             auth=(user or settings.neo4j_user, password or settings.neo4j_password),
+            # 图谱一跳预取会尝试多种关系类型（ACCOMPANIES/AVOIDS_FOOD 等），部分类型在
+            # 重建后的图谱无数据，Neo4j 对每个类型发一条 UNRECOGNIZED 通知刷屏日志。
+            # 这是预期内的探测行为而非错误，只屏蔽该类通知，真实 WARNING 保留。
+            notifications_disabled_categories=["UNRECOGNIZED"],
         )
 
     def close(self) -> None:

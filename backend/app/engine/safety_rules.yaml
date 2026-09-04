@@ -1,0 +1,62 @@
+# 安全规则库（M5 生效）
+# 操作符：eq/ne/gt/gte/lt/lte/in/contains/not_contains/is_empty/is_not_null/any/all/$引用
+# 命名空间：chat.（intent/entities/answer/evidence_pool/evidence_quotes/high_risk_query/disclaimer_added/risk_level）
+# 执行语义：priority 降序；VETO 命中短路后续 VETO（VALIDATE 仍执行）；fail-fast
+
+rules:
+  - id: S001
+    name: 免责声明强制附加
+    category: VETO
+    priority: 100
+    when:
+      chat.intent: { in: [DEPARTMENT, DRUG, KNOWLEDGE, GUIDE] }
+      chat.disclaimer_added: { eq: false }
+    action: REQUIRE_DISCLAIMER
+    reason: "医疗类回答必须附加免责声明：'以上信息仅供参考，不能替代专业医疗建议，如有不适请及时就医。'"
+
+  - id: S002
+    name: 急症症状置顶警告
+    category: VETO
+    priority: 95
+    when:
+      chat.entities: { any: { name: { in: [胸痛, 呼吸困难, 意识模糊, 持续高热, 大量出血, 剧烈头痛] } } }
+    action: SET_HIGH_RISK
+    reason: "检测到急症相关症状（{缺失列表}），回答必须置顶警告并建议立即就医"
+
+  - id: S003
+    name: 用药回答强制提醒
+    category: VETO
+    priority: 90
+    when:
+      chat.intent: { eq: DRUG }
+    action: REQUIRE_DRUG_NOTICE
+    reason: "用药类回答必须追加：'请遵医嘱或药师指导使用，切勿自行调整剂量。'"
+
+  - id: S004
+    name: 高风险检索落空拒答
+    category: VETO
+    priority: 85
+    when:
+      chat.high_risk_query: { eq: true }
+      chat.evidence_pool: { is_empty: true }
+    action: REFUSE
+    reason: "高风险问题且检索无结果，强制拒答：'该问题涉及用药安全，建议咨询医生或药师，本助手暂不回答。'"
+
+  - id: S101
+    name: 无证据回答无效
+    category: VALIDATE
+    priority: 60
+    when:
+      chat.answer: { is_not_empty: true }
+      chat.evidence_quotes: { is_empty: true }
+    action: INVALIDATE_ANSWER
+    reason: "医疗回答必须携带证据引用（图谱节点或检索原文）"
+
+  - id: S102
+    name: 证据引用须真实存在
+    category: VALIDATE
+    priority: 55
+    when:
+      chat.evidence_quotes: { not_contains: "$chat.evidence_pool[].text" }
+    action: INVALIDATE_ANSWER
+    reason: "证据引用必须逐字存在于证据池"

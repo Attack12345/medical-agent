@@ -105,12 +105,18 @@ def safety_agent(state: dict) -> dict:
             entities.append({"name": canonical, "label": "Symptom", "confidence": 1.0})
     quotes = extract_citations(answer, pool, graph_ev, entities)
 
+    # S102 引用域（M8.20）：池原文 + 实体名。链接实体（如孤立节点"关节痛"）是知识库
+    # 合法引用源，其名称引用不应因池内无原文原文被判为"池外"。
+    citation_universe = [str(p.get("text", "")) for p in pool]
+    citation_universe += [str(e.get("name", "")) for e in entities if e.get("name")]
+
     context = build_context({
         "intent": state.get("intent", ""),
         "entities": entities,
         "answer": answer,
         "evidence_pool": pool,
         "evidence_quotes": quotes,
+        "citation_universe": citation_universe,
         "high_risk_query": bool(state.get("high_risk_query")),
         "disclaimer_added": False,  # 每轮新状态（融合后置 true 落库）
         "risk_level": state.get("risk_level", "NONE"),

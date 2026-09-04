@@ -182,7 +182,13 @@ def test_negated_fragments_extraction():
 
 
 def test_carry_forward_drops_negated_entities(monkeypatch):
-    """上轮头痛+头晕，本轮"头不疼了，手疼"且链接为空 → 全部剔除，不追问、不继承。"""
+    """上轮头痛+头晕，本轮"头不疼了，手疼"且链接为空：
+
+    - 有追问余量 → 定向追问（interrupt，提及余下症状"手疼"）；
+    - 追问耗尽 → 全部剔除、不继承、走检索（need_more=False）。
+    """
+    import pytest as _pytest
+
     from app.agent import nodes_basic as nb
 
     monkeypatch.setattr(nb, "get_linker",
@@ -190,10 +196,14 @@ def test_carry_forward_drops_negated_entities(monkeypatch):
     state = {"question": "头不疼了，手疼", "collected_text": "头不疼了，手疼",
              "entities": [{"name": "头痛", "label": "Symptom"}, {"name": "头晕", "label": "Symptom"}],
              "follow_up_left": 2}
-    out = nb.symptom_agent(state)
+    with _pytest.raises(Exception):
+        nb.symptom_agent(state)  # 有追问余量 → interrupt 定向追问（LangGraph 运行时外抛错）
+
+    state0 = dict(state, follow_up_left=0)
+    out = nb.symptom_agent(state0)
     assert out["entities"] == [] and out["need_more"] is False
     # 对照：无否定线索时正常继承
-    state2 = dict(state, question="应该吃什么药", collected_text="应该吃什么药")
+    state2 = dict(state, question="应该吃药", collected_text="应该吃药", follow_up_left=0)
     out2 = nb.symptom_agent(state2)
     assert [e["name"] for e in out2["entities"]] == ["头痛", "头晕"]
 

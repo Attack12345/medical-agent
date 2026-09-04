@@ -57,6 +57,6 @@ rules:
     category: VALIDATE
     priority: 55
     when:
-      chat.evidence_quotes: { not_contains: "$chat.evidence_pool[].text" }
+      chat.evidence_quotes: { not_contains: "$chat.citation_universe[]" }
     action: INVALIDATE_ANSWER
-    reason: "证据引用必须逐字存在于证据池"
+    reason: "证据引用必须存在于证据池原文或链接实体名（M8.20：实体名是孤立节点的合法引用源）"

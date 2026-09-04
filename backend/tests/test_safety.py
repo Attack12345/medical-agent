@@ -21,12 +21,17 @@ RULES = compile_rules(load_rules(Path(__file__).resolve().parents[2] / "backend"
 
 def run(intent="KNOWLEDGE", entities=None, answer="", pool=None, quotes=None,
         high_risk=False, disclaimer_added=False, risk_level="NONE"):
+    ents = entities or []
+    # 与生产 safety_agent 对齐：S102 引用域 = 池原文 + 实体名（M8.20）
+    universe = [str(p.get("text", "")) for p in (pool or [])]
+    universe += [str(e.get("name", "")) for e in ents if e.get("name")]
     ctx = build_context({
         "intent": intent,
-        "entities": entities or [],
+        "entities": ents,
         "answer": answer,
         "evidence_pool": pool or [],
         "evidence_quotes": quotes or [],
+        "citation_universe": universe,
         "high_risk_query": high_risk,
         "disclaimer_added": disclaimer_added,
         "risk_level": risk_level,

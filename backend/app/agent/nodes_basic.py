@@ -132,7 +132,23 @@ def symptom_agent(state: dict) -> dict:
                 return {"entities": carried, "need_more": False,
                         "audit": [f"symptom_agent: 继承上轮实体 {[e['name'] for e in carried]}{note}"]}
             if dropped:
-                # 上轮实体全部被否定 → 不继承也不追问（用户刚描述过现状），按新主诉走检索
+                # 上轮实体全部被否定，但本轮仍有新主诉（如"头不疼，手疼"余下手疼）且词表
+                # 匹配不上 → 定向追问细节（部位/性质/伴随），引导用户给出可匹配的症状词；
+                # 这比直接拒答或通用追问都更接近可用答案。追问次数受 follow_up_left 约束。
+                if left > 0:
+                    segs = re.split(r"[，,。；;！!？?\s]+", text)
+                    remaining = "、".join(s for s in segs if s and not _NEG_CUE_RE.search(s))
+                    target = remaining or "当前症状"
+                    answer = interrupt(
+                        f"了解，{'、'.join(dropped)}已缓解。为了给出有依据的建议，"
+                        f"请具体描述「{target}」的情况：部位、性质（如胀痛/刺痛/酸痛），"
+                        "是否伴随麻木、肿胀或外伤？")
+                    return {
+                        "collected_text": f"{text} {answer}".strip(),
+                        "follow_up_left": left - 1,
+                        "need_more": True,
+                        "audit": [f"symptom_agent: 否定剔除 {dropped} 后定向追问「{target}」"],
+                    }
                 return {"entities": [], "need_more": False,
                         "audit": [f"symptom_agent: 上轮实体全部被否定剔除 {dropped}，按新主诉检索"]}
 

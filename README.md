@@ -62,5 +62,5 @@ python -m pytest backend/tests
 | M5 | 安全层+证据链 | ⏳ |
 | M6 | API+前端 | ⏳ |
 | M7 | 金标集+门禁 | ⏳ |
-| M8 | 微调+文档+简历 | ⏳ |
+
 

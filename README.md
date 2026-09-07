@@ -28,6 +28,8 @@
 
 ## 快速开始
 
+**一键启动（推荐）**：首次克隆仓库需完成下方 0-4 步初始化（含 `pip install -r requirements.txt` 装依赖）；之后的日常启动只需在 IDEA 中右键运行根目录 `main.py`（或命令行 `python main.py`）——它会自动拉起停止的中间件容器（Neo4j/Qdrant/Redis）并启动服务，浏览器访问 <http://127.0.0.1:8092>。
+
 ```bash
 # 0. 配置
 cp .env.example .env    # 填 DASHSCOPE_API_KEY / MYSQL_PASSWORD
@@ -44,8 +46,8 @@ python backend/scripts/build_graph.py
 # 4. 向量库（M3，Qdrant infra/docker-compose.yml）
 python backend/scripts/build_vector_db.py
 
-# 5. 启动（M6）
-uvicorn app.main:app --app-dir backend --port 8090
+# 5. 启动（M6，等价于运行 main.py）
+uvicorn app.main:app --app-dir backend --port 8092
 
 # 测试
 python -m pytest backend/tests
